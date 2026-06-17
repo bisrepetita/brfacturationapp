@@ -15,6 +15,8 @@ const NAV_ITEMS = [
 export function MobileBottomNav() {
   const pathname = usePathname();
 
+  if (pathname.startsWith("/factures/nouvelle")) return null;
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-[#E5E1DA] h-16 md:hidden">
       <div className="flex items-center justify-around h-full px-2 max-w-lg mx-auto">
