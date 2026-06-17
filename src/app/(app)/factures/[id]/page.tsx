@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getInvoice, markInvoicePaid } from "@/lib/invoices";
+import { doc, updateDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { Invoice, BillingSettings, EmailSettings } from "@/types";
 import { InvoiceStatusBadge } from "@/components/ui/invoice-status-badge";
 import { format } from "date-fns";
@@ -54,6 +56,7 @@ export default function InvoiceDetailPage() {
   }, []);
 
   async function handleSend(type: "send" | "remind") {
+    if (!invoice || !settings || !emailSettings) return;
     setSending(true);
     setSendError(null);
     try {
@@ -63,10 +66,42 @@ export default function InvoiceDetailPage() {
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject: editSubject, body: editBody }),
+        body: JSON.stringify({
+          invoice,
+          billingSettings: settings,
+          emailSettings,
+          subject: editSubject,
+          body: editBody,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Erreur inconnue");
+
+      const invoiceRef = doc(db, "invoices", id);
+      if (type === "send") {
+        await updateDoc(invoiceRef, {
+          emailSentAt: serverTimestamp(),
+          status: invoice.status === "validated" ? "sent" : invoice.status,
+          updatedAt: serverTimestamp(),
+        });
+        await addDoc(collection(db, "invoices", id, "history"), {
+          action: "Email envoyé", previousStatus: invoice.status,
+          newStatus: invoice.status === "validated" ? "sent" : invoice.status,
+          changedBy: "client", changedAt: serverTimestamp(),
+          details: { to: invoice.clientSnapshot.email },
+        });
+      } else {
+        await updateDoc(invoiceRef, {
+          reminderSentAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        await addDoc(collection(db, "invoices", id, "history"), {
+          action: "Relance envoyée", previousStatus: invoice.status,
+          newStatus: invoice.status, changedBy: "client", changedAt: serverTimestamp(),
+          details: { to: invoice.clientSnapshot.email },
+        });
+      }
+
       const updated = await getInvoice(id);
       setInvoice(updated);
       setModal(null);
@@ -335,7 +370,7 @@ export default function InvoiceDetailPage() {
       {/* Modal email / relance */}
       {modal && emailSettings && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 pb-20 sm:pb-4"
           style={{ backgroundColor: "rgba(26,26,24,0.4)" }}
           onClick={(e) => { if (e.target === e.currentTarget && !sending) setModal(null); }}
         >

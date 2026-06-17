@@ -17,6 +17,7 @@ import {
   Download, ChevronLeft, Square, CheckSquare, FileSpreadsheet, Mail, BellRing
 } from "lucide-react";
 import { exportInvoicesCSV } from "@/lib/export";
+import { getBillingSettings, getEmailSettings } from "@/lib/settings";
 
 const PAGE_SIZE = 20;
 
@@ -97,10 +98,22 @@ export default function FacturesPage() {
     setBatchAction(type);
     setBatchProgress({ done: 0, total: ids.length });
     const endpoint = type === "send" ? "send" : "remind";
+
+    const [billingSettings, emailSettings] = await Promise.all([
+      getBillingSettings(),
+      getEmailSettings(),
+    ]);
+
     let done = 0;
     for (const id of ids) {
+      const invoice = invoices.find((i) => i.id === id);
+      if (!invoice) { done++; continue; }
       try {
-        await fetch(`/api/invoices/${id}/${endpoint}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+        await fetch(`/api/invoices/${id}/${endpoint}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ invoice, billingSettings, emailSettings }),
+        });
       } catch {
         // on continue même si un envoi échoue
       }
@@ -116,10 +129,12 @@ export default function FacturesPage() {
     if (downloadablePdfIds.length === 0) return;
     setDownloading(true);
     try {
+      const billingSettings = await getBillingSettings();
+      const selectedInvoices = invoices.filter((i) => downloadablePdfIds.includes(i.id));
       const res = await fetch("/api/invoices/pdf/bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: downloadablePdfIds }),
+        body: JSON.stringify({ invoices: selectedInvoices, billingSettings }),
       });
       if (!res.ok) throw new Error("Erreur lors de la génération");
       const blob = await res.blob();
