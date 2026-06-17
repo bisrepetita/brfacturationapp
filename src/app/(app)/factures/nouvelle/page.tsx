@@ -240,7 +240,7 @@ export default function NouvellePage() {
       {/* Barre de navigation bas — visible étapes 1-3 */}
       {step < 4 && (
         <div
-          className="fixed bottom-0 left-0 right-0 z-50 p-4 border-t"
+          className="fixed bottom-0 left-0 right-0 z-40 p-4 border-t"
           style={{ backgroundColor: "#FFFFFF", borderColor: "#E5E1DA" }}
         >
           {/* Résumé discret */}
