@@ -1,4 +1,4 @@
-const CACHE = "br-facturation-v1";
+const CACHE = "br-facturation-v2";
 
 const APP_SHELL = [
   "/",
